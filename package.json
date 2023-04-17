@@ -1,6 +1,6 @@
 {
   "name": "thud-sol-tools",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Misc. helper functions to help interact with the solana blockchain via typescript.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
