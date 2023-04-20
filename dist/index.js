@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.splInstructions = exports.solInstruction = exports.nftInstructionsUsingMetaplex = exports.splInstructionsUsingMetaplex = exports.solInstructionsUsingMetaplex = exports.createMetaplex = exports.createKeypair = exports.sendSolanaTransactionWithSigner = exports.sendV0SolanaTransaction = exports.sendSolanaTransaction = exports.confirmSignatureStatus = exports.isBlockhashExpired = exports.wait = void 0;
+exports.splInstructions = exports.solInstruction = exports.nftInstructionsUsingMetaplex = exports.splInstructionsUsingMetaplex = exports.createMetaplexWithKeypair = exports.createMetaplex = exports.createKeypair = exports.sendSolanaTransactionWithSigner = exports.sendV0SolanaTransaction = exports.sendSolanaTransaction = exports.confirmSignatureStatus = exports.isBlockhashExpired = exports.wait = void 0;
 const web3_js_1 = require("@solana/web3.js");
 const spl_token_1 = require("@solana/spl-token");
 const js_1 = require("@metaplex-foundation/js");
@@ -186,22 +186,21 @@ const createKeypair = (privateKey) => {
     return web3_js_1.Keypair.fromSecretKey(bs58_1.default.decode(privateKey));
 };
 exports.createKeypair = createKeypair;
-const createMetaplex = (connection, keypair) => {
+const createMetaplex = (connection) => {
+    const metaplex = new js_1.Metaplex(connection);
+    return metaplex;
+};
+exports.createMetaplex = createMetaplex;
+const createMetaplexWithKeypair = (connection, keypair) => {
     const metaplex = new js_1.Metaplex(connection);
     metaplex.use((0, js_1.keypairIdentity)(keypair));
     return metaplex;
 };
-exports.createMetaplex = createMetaplex;
-const solInstructionsUsingMetaplex = (metaplex, toOwner, amount) => {
-    return metaplex.system().builders().transferSol({
-        to: toOwner,
-        amount: (0, js_1.sol)(amount),
-    }).getInstructions();
-};
-exports.solInstructionsUsingMetaplex = solInstructionsUsingMetaplex;
-const splInstructionsUsingMetaplex = (metaplex, toOwner, amount, splToken) => __awaiter(void 0, void 0, void 0, function* () {
+exports.createMetaplexWithKeypair = createMetaplexWithKeypair;
+const splInstructionsUsingMetaplex = (metaplex, fromOwner, toOwner, amount, splToken) => __awaiter(void 0, void 0, void 0, function* () {
     return (yield metaplex.tokens().builders().send({
         mintAddress: splToken,
+        fromOwner,
         toOwner,
         amount: (0, js_1.token)(amount),
     })).getInstructions();
@@ -210,7 +209,7 @@ exports.splInstructionsUsingMetaplex = splInstructionsUsingMetaplex;
 /*
   * use this function to support transfer of pNFTs
 */
-const nftInstructionsUsingMetaplex = (metaplex, toOwner, splToken, amount) => __awaiter(void 0, void 0, void 0, function* () {
+const nftInstructionsUsingMetaplex = (metaplex, fromOwner, toOwner, splToken, amount) => __awaiter(void 0, void 0, void 0, function* () {
     const rules = new web3_js_1.PublicKey("eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9");
     const nftOrSft = yield metaplex.nfts().findByMint({
         mintAddress: splToken,
@@ -218,6 +217,7 @@ const nftInstructionsUsingMetaplex = (metaplex, toOwner, splToken, amount) => __
     return (nftOrSft.tokenStandard === 4 ?
         metaplex.nfts().builders().transfer({
             nftOrSft,
+            fromOwner,
             toOwner,
             amount: (0, js_1.token)(1),
             authorizationDetails: {
@@ -227,6 +227,7 @@ const nftInstructionsUsingMetaplex = (metaplex, toOwner, splToken, amount) => __
         :
             metaplex.nfts().builders().transfer({
                 nftOrSft,
+                fromOwner,
                 toOwner,
                 amount: (0, js_1.token)(amount !== null && amount !== void 0 ? amount : 1)
             }).getInstructions());

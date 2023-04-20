@@ -1,7 +1,7 @@
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Signer, SystemProgram, Transaction, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { keypairIdentity, Metaplex, sol, token } from '@metaplex-foundation/js';
+import { keypairIdentity, Metaplex, sol, token, TokenMetadataAuthorityHolder, TokenMetadataAuthorityTokenDelegate } from '@metaplex-foundation/js';
 import bs58 from "bs58";
 
 
@@ -185,26 +185,23 @@ export const createKeypair = (privateKey: string) => {
 }
 
 
-export const createMetaplex = (connection: Connection, keypair?: Keypair) => {
+export const createMetaplex = (connection: Connection) => {
     const metaplex = new Metaplex(connection);
-    if (keypair) {
-        metaplex.use(keypairIdentity(keypair));
-    }
     return metaplex
 }
 
 
-export const solInstructionsUsingMetaplex = (metaplex: Metaplex, toOwner: PublicKey, amount: number) => {
-    return metaplex.system().builders().transferSol({
-        to: toOwner,
-        amount: sol(amount),
-    }).getInstructions()
+export const createMetaplexWithKeypair = (connection: Connection, keypair: Keypair) => {
+    const metaplex = new Metaplex(connection);
+    metaplex.use(keypairIdentity(keypair));
+    return metaplex
 }
 
 
-export const splInstructionsUsingMetaplex = async (metaplex: Metaplex, toOwner: PublicKey, amount: number, splToken: PublicKey) => {
+export const splInstructionsUsingMetaplex = async (metaplex: Metaplex, fromOwner: PublicKey, toOwner: PublicKey, amount: number, splToken: PublicKey) => {
     return (await metaplex.tokens().builders().send({
         mintAddress: splToken,
+        fromOwner,
         toOwner,
         amount: token(amount),
     })).getInstructions()
@@ -214,29 +211,38 @@ export const splInstructionsUsingMetaplex = async (metaplex: Metaplex, toOwner: 
 /* 
   * use this function to support transfer of pNFTs
 */
-export const nftInstructionsUsingMetaplex = async (metaplex: Metaplex, toOwner: PublicKey, splToken: PublicKey, amount?: number) => {
-    const rules = new PublicKey("eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9")
-    const nftOrSft = await metaplex.nfts().findByMint({
-        mintAddress: splToken,
-    });
+export const nftInstructionsUsingMetaplex = async (metaplex: Metaplex, fromOwner: PublicKey, toOwner: PublicKey, splToken: PublicKey, authority: Signer | TokenMetadataAuthorityTokenDelegate | TokenMetadataAuthorityHolder) => {
+    const nftOrSft = await metaplex.nfts().findByMint({ mintAddress: splToken });
 
-    return (
-        nftOrSft.tokenStandard === 4 ?
-            metaplex.nfts().builders().transfer({
-                nftOrSft,
-                toOwner,
-                amount: token(1),
-                authorizationDetails: {
-                    rules
-                }
-            }).getInstructions()
-            :
-            metaplex.nfts().builders().transfer({
-                nftOrSft,
-                toOwner,
-                amount: token(amount ?? 1)
-            }).getInstructions()
-    )
+    let instructions = []
+
+    // not sure if these instructions are needed yet. will find out :)
+    // const dest = await getAssociatedTokenAddress(splToken, toOwner)
+    // const accountInfo = await connection.getAccountInfo(dest)
+    // if (accountInfo === null) {
+    //     instructions.push(createAssociatedTokenAccountInstruction(fromOwner, dest, toOwner, splToken))
+    // }
+
+    if (nftOrSft.tokenStandard === 4) {
+        instructions.push(...metaplex.nfts().builders().transfer({
+            nftOrSft,
+            fromOwner,
+            toOwner,
+            authorizationDetails: {
+                rules: nftOrSft.programmableConfig.ruleSet
+            },
+            authority: authority
+        }).getInstructions())
+    } else {
+        instructions.push(...metaplex.nfts().builders().transfer({
+            nftOrSft,
+            fromOwner,
+            toOwner,
+            authority: authority
+        }).getInstructions())
+    }
+
+    return instructions
 }
 
 
