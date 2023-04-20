@@ -185,9 +185,11 @@ export const createKeypair = (privateKey: string) => {
 }
 
 
-export const createMetaplex = (connection: Connection, keypair: Keypair) => {
+export const createMetaplex = (connection: Connection, keypair?: Keypair) => {
     const metaplex = new Metaplex(connection);
-    metaplex.use(keypairIdentity(keypair));
+    if (keypair) {
+        metaplex.use(keypairIdentity(keypair));
+    }
     return metaplex
 }
 
